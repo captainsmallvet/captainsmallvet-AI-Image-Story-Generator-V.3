@@ -1,0 +1,5 @@
+{
+  "name": "AI Image \u0026 Story Generator V.3",
+  "description": "An application to generate high-quality images from text prompts using Google\u0027s Imagen model. Users can specify the number of images, aspect ratio, and artistic style.",
+  "requestFramePermissions": []
+}
