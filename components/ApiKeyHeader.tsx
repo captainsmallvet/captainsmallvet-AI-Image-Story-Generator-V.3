@@ -1,4 +1,5 @@
 import React from 'react';
+import { Activity, ShieldCheck, RefreshCw } from 'lucide-react';
 
 interface ApiKeyHeaderProps {
     apiKeyInput: string;
@@ -8,6 +9,9 @@ interface ApiKeyHeaderProps {
     onSendKey: () => void;
     onCopyKey: () => void;
     onClearKey: () => void;
+    onOpenLogs?: () => void;
+    onOpenKeyModal?: () => void;
+    isLiveSynced?: boolean;
 }
 
 export const ApiKeyHeader: React.FC<ApiKeyHeaderProps> = ({
@@ -17,7 +21,10 @@ export const ApiKeyHeader: React.FC<ApiKeyHeaderProps> = ({
     keyCopied,
     onSendKey,
     onCopyKey,
-    onClearKey
+    onClearKey,
+    onOpenLogs,
+    onOpenKeyModal,
+    isLiveSynced = false
 }) => {
     return (
         <div className="w-full bg-gray-800 border-b border-gray-700 p-3 sm:p-4 sticky top-0 z-50 shadow-2xl">
@@ -31,8 +38,39 @@ export const ApiKeyHeader: React.FC<ApiKeyHeaderProps> = ({
                             API key :
                         </label>
                         {statusMessage && <span className="text-xs font-semibold text-green-400 animate-pulse">{statusMessage}</span>}
+
+                        {isLiveSynced && (
+                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-700/40 text-[10px] font-mono">
+                                <RefreshCw className="w-2.5 h-2.5 animate-spin" style={{ animationDuration: '6s' }} />
+                                Central Models Live Sync
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
+                        {onOpenLogs && (
+                            <button
+                                type="button"
+                                onClick={onOpenLogs}
+                                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold rounded shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                title="Open AI Execution & Resilience Logs"
+                            >
+                                <Activity className="w-3.5 h-3.5 text-blue-400" />
+                                <span>AI Logs</span>
+                            </button>
+                        )}
+
+                        {onOpenKeyModal && (
+                            <button
+                                type="button"
+                                onClick={onOpenKeyModal}
+                                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold rounded shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                title="Test & Securely Manage API Key"
+                            >
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Test Key</span>
+                            </button>
+                        )}
+
                         <button 
                             onClick={onSendKey} 
                             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded shadow-md transition-all active:scale-95 cursor-pointer"

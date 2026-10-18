@@ -283,7 +283,12 @@ const StoryWriter: React.FC<StoryWriterProps> = ({
                         Text Reasoning Model (AI Brain)
                     </label>
                     <select id="reasoningModel" value={selectedReasoningModel} onChange={(e) => onReasoningModelChange(e.target.value as ReasoningModelKey)} className="w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm focus:ring-2 focus:ring-blue-400 outline-none text-sm">
-                        {(reasoningModelOptions && reasoningModelOptions.length > 0 ? reasoningModelOptions : REASONING_MODELS).map(m => <option key={m.key} value={m.key}>{m.name}</option>)}
+                        {(reasoningModelOptions && reasoningModelOptions.length > 0 ? reasoningModelOptions : REASONING_MODELS)
+                            .filter((m, idx, arr) => arr.findIndex(x => x.key === m.key) === idx)
+                            .map(m => (
+                                <option key={m.key} value={m.key}>{m.name}</option>
+                            ))
+                        }
                     </select>
                 </div>
             </div>

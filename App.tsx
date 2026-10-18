@@ -9,7 +9,13 @@ import {
     expandImage
 } from './services/geminiService';
 import { ASPECT_RATIOS, AspectRatio, ImageStyleKey, ImageModelKey, ReasoningModelKey } from './constants';
-import { fetchCentralizedModels, AIModelOption, FALLBACK_IMAGE_MODELS, FALLBACK_TEXT_MODELS } from './services/centralModelService';
+import { 
+    subscribeToCentralizedModels, 
+    fetchCentralizedModels, 
+    AIModelOption, 
+    FALLBACK_IMAGE_MODELS, 
+    FALLBACK_TEXT_MODELS 
+} from './services/centralModelService';
 import Spinner from './components/Spinner';
 import ReferenceImages from './components/ReferenceImages';
 import { blobToBase64 } from './utils/imageUtils';
@@ -20,6 +26,9 @@ import { AlertTriangle } from 'lucide-react';
 import { useApiKey } from './hooks/useApiKey';
 import ApiKeyHeader from './components/ApiKeyHeader';
 import GeneratedImagesDisplay from './components/GeneratedImagesDisplay';
+import FloatingMenu from './components/FloatingMenu';
+import AILogModal from './components/AILogModal';
+import ApiKeyModal from './components/ApiKeyModal';
 
 declare global {
     interface AIStudio {
@@ -44,6 +53,9 @@ const App: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isErrorPopupOpen, setIsErrorPopupOpen] = useState<boolean>(false);
+    const [isLogModalOpen, setIsLogModalOpen] = useState<boolean>(false);
+    const [isKeyModalOpen, setIsKeyModalOpen] = useState<boolean>(false);
+    const [isLiveSynced, setIsLiveSynced] = useState<boolean>(false);
 
     const handleSetError = useCallback((msg: string) => {
         setError(msg);
@@ -59,19 +71,29 @@ const App: React.FC = () => {
         handleClearKey
     } = useApiKey(handleSetError);
 
-    // Load Centralized Models from Firestore on every page refresh (Level 1 Importance)
+    // Subscribe to Centralized Models from Firestore in real-time (Requirement 2)
     useEffect(() => {
-        let isMounted = true;
-        fetchCentralizedModels().then((result) => {
-            if (!isMounted) return;
+        const unsubscribe = subscribeToCentralizedModels((result) => {
             setImageModelOptions(result.imageModels);
             setReasoningModelOptions(result.textReasoningModels);
-            setImageModel(result.defaultImageModel);
-            setReasoningModel(result.defaultTextModel);
-        }).catch(err => {
-            console.warn("Using fallback model lists:", err);
+            setIsLiveSynced(Boolean(result.isLiveSynced));
+            
+            // Auto-select level 1 default if not yet chosen
+            setImageModel(prev => {
+                const exists = result.imageModels.some(m => m.key === prev);
+                return exists ? prev : (result.defaultImageModel || prev);
+            });
+            setReasoningModel(prev => {
+                const exists = result.textReasoningModels.some(m => m.key === prev);
+                return exists ? prev : (result.defaultTextModel || prev);
+            });
         });
-        return () => { isMounted = false; };
+
+        return () => {
+            if (typeof unsubscribe === 'function') {
+                unsubscribe();
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -399,6 +421,9 @@ const App: React.FC = () => {
                 onSendKey={handleSendKey}
                 onCopyKey={handleCopyKey}
                 onClearKey={handleClearKey}
+                onOpenLogs={() => setIsLogModalOpen(true)}
+                onOpenKeyModal={() => setIsKeyModalOpen(true)}
+                isLiveSynced={isLiveSynced}
             />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -457,7 +482,11 @@ const App: React.FC = () => {
                                 Image Model (Art Style)
                             </label>
                             <select value={imageModel} onChange={(e) => setImageModel(e.target.value as ImageModelKey)} className="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 focus:ring-2 focus:ring-indigo-400 outline-none transition-all">
-                                {imageModelOptions.map(m => <option key={m.key} value={m.key}>{m.name}</option>)}
+                                {imageModelOptions
+                                    .filter((m, idx, arr) => arr.findIndex(x => x.key === m.key) === idx)
+                                    .map(m => (
+                                        <option key={m.key} value={m.key}>{m.name}</option>
+                                    ))}
                             </select>
                         </div>
                     </div>
@@ -522,6 +551,31 @@ const App: React.FC = () => {
                 errorMessage={error || ''}
                 activeModel={imageModel}
                 context="Image Generator"
+            />
+
+            <FloatingMenu
+                selectedReasoningModel={reasoningModel}
+                onReasoningModelChange={setReasoningModel}
+                reasoningModelOptions={reasoningModelOptions}
+                selectedImageModel={imageModel}
+                onImageModelChange={setImageModel}
+                imageModelOptions={imageModelOptions}
+                onOpenLogs={() => setIsLogModalOpen(true)}
+                onOpenKeySettings={() => setIsKeyModalOpen(true)}
+            />
+
+            <AILogModal
+                isOpen={isLogModalOpen}
+                onClose={() => setIsLogModalOpen(false)}
+            />
+
+            <ApiKeyModal
+                isOpen={isKeyModalOpen}
+                onClose={() => setIsKeyModalOpen(false)}
+                currentKey={apiKeyInput}
+                onKeySaved={(newKey) => {
+                    setApiKeyInput(newKey);
+                }}
             />
         </div>
     );
