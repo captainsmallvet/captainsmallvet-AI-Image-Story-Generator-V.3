@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import type { Unsubscribe } from 'firebase/firestore';
 
 export const firebaseConfig = {
   projectId: "gen-lang-client-0014422363",
@@ -31,14 +32,16 @@ export interface CentralModelsResult {
 
 // Fallback models if Firestore fails or is offline
 export const FALLBACK_TEXT_MODELS: AIModelOption[] = [
-  { key: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (High Speed)', category: 'text_reasoning', order: 1, isDefaultLevel1: false, isDefaultLevel2: false },
-  { key: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Workhorse)', category: 'text_reasoning', order: 2, isDefaultLevel1: true, isDefaultLevel2: false },
-  { key: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', category: 'text_reasoning', order: 3, isDefaultLevel1: false, isDefaultLevel2: false },
-  { key: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', category: 'text_reasoning', order: 4, isDefaultLevel1: false, isDefaultLevel2: false },
-  { key: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview (Deep Reasoning)', category: 'text_reasoning', order: 5, isDefaultLevel1: false, isDefaultLevel2: false },
-  { key: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (Max Quota)', category: 'text_reasoning', order: 6, isDefaultLevel1: false, isDefaultLevel2: false },
-  { key: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', category: 'text_reasoning', order: 7, isDefaultLevel1: false, isDefaultLevel2: false },
-  { key: 'gemini-flash-latest', name: 'Gemini Flash Latest', category: 'text_reasoning', order: 8, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-3.8-flash', name: '(20)Gemini 3.8 Flash', category: 'text_reasoning', order: 1, isDefaultLevel1: true, isDefaultLevel2: false },
+  { key: 'gemini-3.7-flash', name: '(20)Gemini 3.7 Flash', category: 'text_reasoning', order: 2, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-3.6-flash', name: '(20)Gemini 3.6 Flash', category: 'text_reasoning', order: 3, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-3.5-flash', name: '(20)Gemini 3.5 Flash', category: 'text_reasoning', order: 4, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-3-flash-preview', name: '(20)Gemini 3 Flash Preview', category: 'text_reasoning', order: 5, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-3.5-flash-lite', name: '(500)Gemini 3.5 Flash Lite', category: 'text_reasoning', order: 6, isDefaultLevel1: false, isDefaultLevel2: true },
+  { key: 'gemini-3.1-flash-lite', name: '(500)Gemini 3.1 Flash Lite', category: 'text_reasoning', order: 7, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-3.1-pro-preview', name: '(0)Gemini 3.1 Pro Preview', category: 'text_reasoning', order: 8, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-flash-latest', name: 'Gemini Flash Latest', category: 'text_reasoning', order: 9, isDefaultLevel1: false, isDefaultLevel2: false },
+  { key: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite Latest', category: 'text_reasoning', order: 22, isDefaultLevel1: false, isDefaultLevel2: false },
 ];
 
 export const FALLBACK_IMAGE_MODELS: AIModelOption[] = [
@@ -124,8 +127,17 @@ const processModelDocs = (docs: any[]): CentralModelsResult => {
     const isDefaultLevel1 = data.isDefaultLevel1 === true || data.defaultLevel === 1 || data.defaultForLevel === 'level_1';
     const isDefaultLevel2 = data.isDefaultLevel2 === true || data.defaultLevel === 2 || data.defaultForLevel === 'level_2';
 
-    // Deduplication check: Keep higher order or update
-    if (!modelMap.has(modelId)) {
+    // Deduplication check: Keep isDefaultLevel1 flag and lowest order
+    if (modelMap.has(modelId)) {
+      const existing = modelMap.get(modelId)!;
+      modelMap.set(modelId, {
+        ...existing,
+        name: existing.name || name,
+        order: Math.min(existing.order, order),
+        isDefaultLevel1: existing.isDefaultLevel1 || isDefaultLevel1,
+        isDefaultLevel2: existing.isDefaultLevel2 || isDefaultLevel2,
+      });
+    } else {
       modelMap.set(modelId, {
         key: modelId,
         name,
@@ -165,7 +177,7 @@ const processModelDocs = (docs: any[]): CentralModelsResult => {
 
   // Level 1 Defaults
   const defaultTextObj = finalTexts.find(m => m.isDefaultLevel1) || finalTexts[0];
-  const defaultTextModel = defaultTextObj ? defaultTextObj.key : 'gemini-3.6-flash';
+  const defaultTextModel = defaultTextObj ? defaultTextObj.key : 'gemini-3.8-flash';
 
   const defaultImageObj = finalImages.find(m => m.isDefaultLevel1) || finalImages[0];
   const defaultImageModel = defaultImageObj ? defaultImageObj.key : 'gemini-3-pro-image';
@@ -183,7 +195,7 @@ const processModelDocs = (docs: any[]): CentralModelsResult => {
 let cachedModels: CentralModelsResult = {
   textReasoningModels: FALLBACK_TEXT_MODELS,
   imageModels: FALLBACK_IMAGE_MODELS,
-  defaultTextModel: 'gemini-3.6-flash',
+  defaultTextModel: 'gemini-3.8-flash',
   defaultImageModel: 'gemini-3-pro-image',
   isLiveSynced: false
 };

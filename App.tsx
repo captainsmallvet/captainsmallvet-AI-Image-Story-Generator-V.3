@@ -12,6 +12,7 @@ import { ASPECT_RATIOS, AspectRatio, ImageStyleKey, ImageModelKey, ReasoningMode
 import { 
     subscribeToCentralizedModels, 
     fetchCentralizedModels, 
+    getCachedCentralModels,
     AIModelOption, 
     FALLBACK_IMAGE_MODELS, 
     FALLBACK_TEXT_MODELS 
@@ -44,9 +45,22 @@ const App: React.FC = () => {
     const [imageModelOptions, setImageModelOptions] = useState<AIModelOption[]>(FALLBACK_IMAGE_MODELS);
     const [reasoningModelOptions, setReasoningModelOptions] = useState<AIModelOption[]>(FALLBACK_TEXT_MODELS);
 
-    const [imageModel, setImageModel] = useState<ImageModelKey>('gemini-3-pro-image');
-    const [reasoningModel, setReasoningModel] = useState<ReasoningModelKey>('gemini-3.6-flash');
+    const [imageModel, setImageModel] = useState<ImageModelKey>(() => getCachedCentralModels().defaultImageModel || 'gemini-3-pro-image');
+    const [reasoningModel, setReasoningModel] = useState<ReasoningModelKey>(() => getCachedCentralModels().defaultTextModel || 'gemini-3.8-flash');
     const [maxCaptionLength, setMaxCaptionLength] = useState<number>(60);
+
+    const userManuallySelectedTextModelRef = useRef<boolean>(false);
+    const userManuallySelectedImageModelRef = useRef<boolean>(false);
+
+    const handleSelectReasoningModel = useCallback((modelKey: ReasoningModelKey) => {
+        userManuallySelectedTextModelRef.current = true;
+        setReasoningModel(modelKey);
+    }, []);
+
+    const handleSelectImageModel = useCallback((modelKey: ImageModelKey) => {
+        userManuallySelectedImageModelRef.current = true;
+        setImageModel(modelKey);
+    }, []);
 
     const [images, setImages] = useState<string[]>([]);
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -78,15 +92,25 @@ const App: React.FC = () => {
             setReasoningModelOptions(result.textReasoningModels);
             setIsLiveSynced(Boolean(result.isLiveSynced));
             
-            // Auto-select level 1 default if not yet chosen
-            setImageModel(prev => {
-                const exists = result.imageModels.some(m => m.key === prev);
-                return exists ? prev : (result.defaultImageModel || prev);
-            });
-            setReasoningModel(prev => {
-                const exists = result.textReasoningModels.some(m => m.key === prev);
-                return exists ? prev : (result.defaultTextModel || prev);
-            });
+            // Set default models strictly following Centralized AI Models Registry Level 1
+            // Unless the user explicitly picked another model manually in this session
+            if (!userManuallySelectedTextModelRef.current && result.defaultTextModel) {
+                setReasoningModel(result.defaultTextModel);
+            } else if (result.defaultTextModel) {
+                setReasoningModel(prev => {
+                    const exists = result.textReasoningModels.some(m => m.key === prev);
+                    return exists ? prev : result.defaultTextModel;
+                });
+            }
+
+            if (!userManuallySelectedImageModelRef.current && result.defaultImageModel) {
+                setImageModel(result.defaultImageModel);
+            } else if (result.defaultImageModel) {
+                setImageModel(prev => {
+                    const exists = result.imageModels.some(m => m.key === prev);
+                    return exists ? prev : result.defaultImageModel;
+                });
+            }
         });
 
         return () => {
@@ -481,7 +505,7 @@ const App: React.FC = () => {
                                 <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                 Image Model (Art Style)
                             </label>
-                            <select value={imageModel} onChange={(e) => setImageModel(e.target.value as ImageModelKey)} className="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 focus:ring-2 focus:ring-indigo-400 outline-none transition-all">
+                            <select value={imageModel} onChange={(e) => handleSelectImageModel(e.target.value as ImageModelKey)} className="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 focus:ring-2 focus:ring-indigo-400 outline-none transition-all">
                                 {imageModelOptions
                                     .filter((m, idx, arr) => arr.findIndex(x => x.key === m.key) === idx)
                                     .map(m => (
@@ -537,7 +561,7 @@ const App: React.FC = () => {
                         selectedStyle={style} 
                         onStyleChange={setStyle}
                         selectedReasoningModel={reasoningModel} 
-                        onReasoningModelChange={setReasoningModel}
+                        onReasoningModelChange={handleSelectReasoningModel}
                         reasoningModelOptions={reasoningModelOptions}
                         maxCaptionLength={maxCaptionLength}
                         onMaxCaptionLengthChange={setMaxCaptionLength}
@@ -555,10 +579,10 @@ const App: React.FC = () => {
 
             <FloatingMenu
                 selectedReasoningModel={reasoningModel}
-                onReasoningModelChange={setReasoningModel}
+                onReasoningModelChange={handleSelectReasoningModel}
                 reasoningModelOptions={reasoningModelOptions}
                 selectedImageModel={imageModel}
-                onImageModelChange={setImageModel}
+                onImageModelChange={handleSelectImageModel}
                 imageModelOptions={imageModelOptions}
                 onOpenLogs={() => setIsLogModalOpen(true)}
                 onOpenKeySettings={() => setIsKeyModalOpen(true)}
